@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>استرجاع كود Steam Guard</title>
+<style>
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #0a3d2c, #064d36);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    color: #fff;
+}
+.container { max-width: 600px; width: 100%; }
+.card {
+    background: #0c4b3a;
+    border-radius: 25px;
+    padding: 30px;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+    text-align: center;
+}
+h1 { margin-bottom: 10px; font-size: 28px; color: #b2f2bb; }
+p { margin-bottom: 20px; color: #d4f1dc; }
+input {
+    width: 100%;
+    padding: 12px 15px;
+    margin: 10px 0;
+    border-radius: 12px;
+    border: none;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+button {
+    width: 100%;
+    padding: 14px;
+    background: #1db954;
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+}
+button:hover { background: #16a34a; }
+.message {
+    margin-top: 15px;
+    padding: 12px;
+    border-radius: 12px;
+    display: none;
+    font-size: 14px;
+}
+.message.info { background: #134e3f; color: #b2f2bb; display: block; }
+.message.success { background: #0d3e2f; color: #a0f4a0; display: block; }
+.message.error { background: #5a1f17; color: #ff7f7f; display: block; }
+.code-box {
+    margin-top: 20px;
+    font-size: 32px;
+    font-weight: bold;
+    color: #1db954;
+    background: #072b1e;
+    padding: 20px;
+    border-radius: 12px;
+    word-break: break-all;
+    display: none;
+    cursor: pointer;
+    transition: 0.3s;
+}
+.code-box:hover {
+    background: #0a3d2c;
+    color: #b2f2bb;
+}
+.countdown {
+    margin-top: 10px;
+    font-size: 18px;
+    color: #b2f2bb;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h1>🎮 استرجاع كود Steam Guard</h1>
+        <p>أدخل رقم الطلب أولًا للتحقق</p>
+
+        <input type="text" id="orderNumber" placeholder="رقم الطلب">
+        <button id="checkOrderBtn">✔ تحقق من الطلب</button>
+
+        <div id="orderMsg" class="message info"></div>
+
+        <!-- خانة اليوزر مخفية في البداية -->
+        <input type="text" id="steamUsername" placeholder="اسم المستخدم" style="display:none;">
+        <button id="getCodeBtn" style="display:none;">🔑 احصل على الكود</button>
+
+        <div id="countdown" class="countdown"></div>
+        <div id="resultMsg" class="message"></div>
+        <div id="codeBox" class="code-box" title="اضغط لنسخ الكود"></div>
+    </div>
+</div>
+
+<script>
+const checkOrderBtn = document.getElementById('checkOrderBtn');
+const getCodeBtn = document.getElementById('getCodeBtn');
+const orderNumberInput = document.getElementById('orderNumber');
+const steamUsernameInput = document.getElementById('steamUsername');
+const orderMsg = document.getElementById('orderMsg');
+const resultMsg = document.getElementById('resultMsg');
+const codeBox = document.getElementById('codeBox');
+const countdownEl = document.getElementById('countdown');
+
+// التحقق من رقم الطلب
+checkOrderBtn.addEventListener('click', async () => {
+    const order = orderNumberInput.value.trim();
+    resultMsg.style.display = 'none';
+    codeBox.style.display = 'none';
+    countdownEl.textContent = '';
+
+    if (!order) {
+        orderMsg.textContent = "❌ الرجاء إدخال رقم الطلب";
+        orderMsg.className = 'message error';
+        return;
+    }
+
+    try {
+        const res = await fetch('/check_order', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ order_number: order })
+        });
+        const data = await res.json();
+        if (data.success) {
+            orderMsg.textContent = "⚠️ الطلب موجود، لا تسجل الآن. أدخل اسم المستخدم لتسجيل الدخول";
+            orderMsg.className = 'message info';
+            steamUsernameInput.style.display = 'block';
+            getCodeBtn.style.display = 'block';
+        } else {
+            orderMsg.textContent = "❌ الطلب غير موجود";
+            orderMsg.className = 'message error';
+        }
+    } catch(e) {
+        orderMsg.textContent = "❌ حدث خطأ، حاول لاحقًا";
+        orderMsg.className = 'message error';
+    }
+});
+
+// جلب الكود مع عداد 90 ثانية
+getCodeBtn.addEventListener('click', async () => {
+    const order = orderNumberInput.value.trim();
+    const username = steamUsernameInput.value.trim();
+    resultMsg.style.display = 'none';
+    codeBox.style.display = 'none';
+    countdownEl.textContent = '';
+
+    if (!username) {
+        resultMsg.textContent = "❌ الرجاء إدخال اسم المستخدم";
+        resultMsg.className = 'message error';
+        resultMsg.style.display = 'block';
+        return;
+    }
+
+    resultMsg.textContent = "⏳ جاري البحث عن الكود... الرجاء الانتظار";
+    resultMsg.className = 'message info';
+    resultMsg.style.display = 'block';
+
+    let code = null;
+    let timeLeft = 90; // ← عدلنا من 60 إلى 90 ثانية
+    countdownEl.textContent = `⏱ الوقت المتبقي: ${timeLeft} ثانية`;
+
+    const startTime = Date.now();
+    const timeout = 90000; // 90 ثانية
+
+    const countdownInterval = setInterval(() => {
+        timeLeft--;
+        countdownEl.textContent = `⏱ الوقت المتبقي: ${timeLeft} ثانية`;
+        if (timeLeft <= 0) clearInterval(countdownInterval);
+    }, 1000);
+
+    while (!code && (Date.now() - startTime < timeout)) {
+        try {
+            const res = await fetch('/get_steam_code', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ order_number: order, steam_username: username })
+            });
+            const data = await res.json();
+            if (data.success && data.steam_code) {
+                code = data.steam_code;
+                break;
+            }
+        } catch(e) { console.error(e); }
+        await new Promise(r => setTimeout(r, 2000));
+    }
+
+    clearInterval(countdownInterval);
+
+    if (code) {
+        codeBox.textContent = code;
+        codeBox.style.display = 'block';
+        resultMsg.textContent = "✅ تم العثور على الكود! اضغط على الكود لنسخه";
+        resultMsg.className = 'message success';
+    } else {
+        resultMsg.textContent = "❌ لم يتم العثور على الكود خلال 90 ثانية، حاول لاحقًا";
+        resultMsg.className = 'message error';
+    }
+});
+
+// نسخ الكود عند الضغط عليه
+codeBox.addEventListener('click', () => {
+    navigator.clipboard.writeText(codeBox.textContent);
+    alert(`✅ تم نسخ الكود: ${codeBox.textContent}`);
+});
+</script>
+
+</body>
+</html>
